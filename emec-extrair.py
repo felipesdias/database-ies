@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 from bs4 import BeautifulSoup
-import requests, json, time, base64, io, random
+import requests, json, time, base64, io, random, os, codecs
 from string import digits
 from threading import Thread
 from threading import Lock
@@ -216,7 +216,7 @@ def getCursoNome(cursos_ies, cursos_unidades, requi, unidades, cod64, semaforo_c
 	semaforo_curso.release()
 	mutex_cursos.release()
 
-def pegaTudo(TRA, IES, CURSOS, cont, mutex, semaforo, semaforo2):
+def pegaTudo(TRA, IES, CURSOS, cont, mutex, semaforo, semaforo2, codigo_ies):
 	ini_thread = time.time()
 
 	erros = 0
@@ -224,7 +224,6 @@ def pegaTudo(TRA, IES, CURSOS, cont, mutex, semaforo, semaforo2):
 	remove_digits = str.maketrans('', '', digits)
 
 	field_1 = [x.text.strip() for x in TRA.find_all("td")][:-1]
-	codigo_ies = field_1[0].split(')')[0].split('(')[1].strip()
 	cod64 = base64.b64encode(codigo_ies.encode('ascii')).decode('ascii')
 	unidades = []
 	cursos = []
@@ -463,10 +462,12 @@ def pegaTudo(TRA, IES, CURSOS, cont, mutex, semaforo, semaforo2):
 		print("Restam:", num_ies)
 		print("Tempo:", time.time()-ini)
 		if num_ies%200 == 0:
+			print("NÃO FECHAR")
 			with io.open('IES.json', 'w', encoding='utf-8') as f:
 				json.dump(IES, f, ensure_ascii=False)
 			with io.open('CURSOS.json', 'w', encoding='utf-8') as f:
 				json.dump(CURSOS, f, ensure_ascii=False)
+			print("PODE FECHAR\n")
 
 	if num_ies == 0:
 		semaforo2.release()
@@ -476,8 +477,6 @@ def pegaTudo(TRA, IES, CURSOS, cont, mutex, semaforo, semaforo2):
 	mutex.release()
 
 
-arquivo = open('cursos_sem_unidades.txt', 'w')
-arquivo.close()
 
 # Dados para buscar lista de IES
 data = {
@@ -524,8 +523,11 @@ print('Tempo para baixar lista de IES:', time.time()-ini)
 for match in page_ini.findAll('span', {"style": "color:#FE773D"}):
 	match.extract()
 
+
 IES = []
 CURSOS = []
+
+ja_buscados = {}
 
 mutex = Lock()
 semaforo = BoundedSemaphore(15)
@@ -535,6 +537,7 @@ ini = time.time()
 contador = 0
 requisicoes_total = 0
 erros_total = 0
+
 mais_lenta = {
 	"codigo": "",
 	"nome": "",
@@ -549,20 +552,39 @@ semaforo2.acquire()
 trs_ies = page_ini.find("tbody").find_all("tr")
 num_ies = len(trs_ies)
 
-random.shuffle(trs_ies)
+if os.path.isfile("IES.json") and os.path.isfile("CURSOS.json"):
+	IES = json.load(codecs.open('IES.json', 'r', 'utf-8'))
+	CURSOS = json.load(codecs.open('CURSOS.json', 'r', 'utf-8'))
 
-for idx, tr in enumerate(trs_ies):
-	semaforo.acquire()
-	Thread(target=pegaTudo, args=(tr, IES, CURSOS, idx, mutex, semaforo, semaforo2)).start()
+	for x in IES:
+		ja_buscados[x["codigo"]] = True
+		num_ies -= 1
 
-semaforo2.acquire()
 
-with io.open('IES.json', 'w', encoding='utf-8') as f:
-	json.dump(IES, f, ensure_ascii=False)
-with io.open('CURSOS.json', 'w', encoding='utf-8') as f:
-	json.dump(CURSOS, f, ensure_ascii=False)
+if num_ies > 0:
+	arquivo = open('cursos_sem_unidades.txt', 'w')
+	arquivo.close()
 
-print("Tempo Total:", time.time()-ini)
-print("Requisições:", requisicoes_total+erros_total)
-print("Sucesso:", requisicoes_total)
-print("Erros:", erros_total)
+	random.shuffle(trs_ies)
+	
+	for idx, tr in enumerate(trs_ies):
+		codigo_ies = tr.find("td").text.strip().split(')')[0].split('(')[1].strip()
+		if codigo_ies not in ja_buscados:
+			semaforo.acquire()
+			Thread(target=pegaTudo, args=(tr, IES, CURSOS, idx, mutex, semaforo, semaforo2, codigo_ies)).start()
+
+	semaforo2.acquire()
+
+	print("NÃO FECHAR")
+	with io.open('IES.json', 'w', encoding='utf-8') as f:
+		json.dump(IES, f, ensure_ascii=False)
+	with io.open('CURSOS.json', 'w', encoding='utf-8') as f:
+		json.dump(CURSOS, f, ensure_ascii=False)
+	print("PODE FECHAR\n")
+
+	print("Tempo Total:", time.time()-ini)
+	print("Requisições:", requisicoes_total+erros_total)
+	print("Sucesso:", requisicoes_total)
+	print("Erros:", erros_total)
+else:
+	print("Todos dados já foram baixados")

@@ -16,6 +16,6 @@ def uprint(*objects, sep=' ', end='\n', file=sys.stdout):
 		print(*map(f, objects), sep=sep, end=end, file=file)
 
 
-IES = json.load(codecs.open('IES - Comprimido.json', 'r', 'utf-8'))
+IES = json.load(codecs.open('IES.json', 'r', 'utf-8'))
 CURSOS = json.load(codecs.open('CURSOS.json', 'r', 'utf-8'))
 
