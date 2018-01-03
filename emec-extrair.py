@@ -32,7 +32,7 @@ def getCursoNome(cursos_ies, cursos_unidades, requi, unidades, cod64, semaforo_c
 		td_curso = [x.text.strip() for x in curso.find_all("td")]
 		
 		if "Nenhum registro encontrado" in td_curso[0]:
-			continue
+			break
 
 		codigo_curso = td_curso[0]
 
@@ -71,7 +71,7 @@ def getCursoNome(cursos_ies, cursos_unidades, requi, unidades, cod64, semaforo_c
 				elif "Carga horária mínima:" in td[i].text:
 					carga_horaria = td[i+1].text.strip()
 				elif "Situação de Funcionamento:" in td[i].text:
-					sitiacao_curso = td[i+1].text.strip()
+					situacao_curso = td[i+1].text.strip()
 				elif "Periodicidade (Integralização):" in td[i].text:
 					periodicidade = td[i+1].text.strip()
 				elif "Vagas Anuais Autorizadas:" in td[i].text:
@@ -136,7 +136,7 @@ def getCursoNome(cursos_ies, cursos_unidades, requi, unidades, cod64, semaforo_c
 		for tbody in page_end_unidades.find_all("tbody"):
 			td = [x.text.strip() for x in tbody.find_all("td")]
 			if td[0] == "Nenhum registro encontrado.":
-				continue
+				break
 
 			endereco = td[1]
 
@@ -198,10 +198,10 @@ def getCursoNome(cursos_ies, cursos_unidades, requi, unidades, cod64, semaforo_c
 		cursos_ies.append({
 			'codigo': td_curso[0],
 			'nome': nome,
-			'modalidade': codigo_curso,
+			'modalidade': td_curso[1],
 			'data_inicio': data_inicio,
 			'carga_horaria': carga_horaria,
-			'sitiacao': sitiacao_curso,
+			'situacao': situacao_curso,
 			'periodicidade': periodicidade,
 			'vagas_anuais': vagas_anuais,
 			'grau': td_curso[2],
@@ -217,8 +217,6 @@ def getCursoNome(cursos_ies, cursos_unidades, requi, unidades, cod64, semaforo_c
 	mutex_cursos.release()
 
 def pegaTudo(TRA, IES, CURSOS, cont, mutex, semaforo, semaforo2, codigo_ies):
-	ini_thread = time.time()
-
 	erros = 0
 	requisicoes = 0
 	remove_digits = str.maketrans('', '', digits)
@@ -255,7 +253,15 @@ def pegaTudo(TRA, IES, CURSOS, cont, mutex, semaforo, semaforo2, codigo_ies):
 
 	for tr in page_hist_ies.find_all("tr")[1::]:
 		hist_ies = [x.text.strip() for x in tr.find_all("td")]
-		indice_historico.append(hist_ies)
+		if "Nenhum registro encontrado" in hist_ies[0]:
+			break
+
+		indice_historico.append({
+			'ano': hist_ies[0],
+			'ci': hist_ies[1],
+			'igc': hist_ies[2],
+			'ci_ead': hist_ies[3]
+		})
 	#######	
 
 	# PEga infos da IES
@@ -401,7 +407,6 @@ def pegaTudo(TRA, IES, CURSOS, cont, mutex, semaforo, semaforo2, codigo_ies):
 	global ini
 	global erros_total
 	global requisicoes_total
-	global mais_lenta
 
 	mutex.acquire(1)
 	IES.append({
@@ -432,28 +437,6 @@ def pegaTudo(TRA, IES, CURSOS, cont, mutex, semaforo, semaforo2, codigo_ies):
 		CURSOS.append(x)
 
 	num_ies -= 1
-
-	fim_thread = time.time()-ini_thread
-	if mais_lenta["tempo"] < fim_thread:
-		mais_lenta["codigo"] = codigo_ies
-		mais_lenta["nome"] = field_1[0].split(')')[1].strip()
-		mais_lenta["url"] = "http://emec.mec.gov.br/emec/consulta-cadastro/detalhamento/d96957f455f6405d14c6542552b0f6eb/"+cod64
-		mais_lenta["tempo"] = fim_thread
-		mais_lenta["requisicoes1"] = requisicoes
-		mais_lenta["requisicoes2"] = erros
-		mais_lenta["unidades"] = len(unidades)
-		mais_lenta["cursos"] = len(total_cursos_ies)
-
-		print("=========================")
-		print("=== Temos um perdedos ===")
-		print("=========================")
-		print("\t", "Nome:", mais_lenta["nome"])
-		print("\t", "Tempo:", mais_lenta["tempo"])
-		print("\t", "Requisições sucesso:", mais_lenta["requisicoes1"])
-		print("\t", "Requisições errado:", mais_lenta["requisicoes2"])
-		print("\t", "Nº Unidades:", mais_lenta["unidades"])
-		print("\t", "Nº Cursos:", mais_lenta["cursos"])
-		print("\t", "URL:", mais_lenta["url"], "\n")
 	
 	if num_ies%200 == 0 or num_ies <= 50:
 		print("\n\nRequisições:", requisicoes_total+erros_total)
@@ -538,14 +521,6 @@ contador = 0
 requisicoes_total = 0
 erros_total = 0
 
-mais_lenta = {
-	"codigo": "",
-	"nome": "",
-	"url": "",
-	"tempo": 0,
-	"requisicoes": 0
-}
-
 semaforo2.acquire()
 
 
@@ -564,6 +539,8 @@ if os.path.isfile("IES.json") and os.path.isfile("CURSOS.json"):
 if num_ies > 0:
 	arquivo = open('cursos_sem_unidades.txt', 'w')
 	arquivo.close()
+
+	print("Buscar dados de", num_ies, "IES")
 
 	random.shuffle(trs_ies)
 	

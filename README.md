@@ -1,15 +1,20 @@
 # Extrair dados de IES do [EMEC](http://emec.mec.gov.br/)
 
+Dados de execução (Servidor gCloud southAmerica 8 núcleos):
+ * Tempo de execução: 12312 segundos -> 3h e 35 minutos
+ * Número de Requisições: 214750
+
+
 Importante:
  * Python 3
  * Contem todas informações das IES e dos cursos, incluindo históricos de indicadores
  * Tempo de execução +- 4~5 horas, servidor BR da google, 8 cores
  * ans-extrair.py é o script que extrair os dados e salva como JSON
  * ans-leitura.py modelo para leitura do JSON
- * CURSOS.json dados extraído em 29/12/2017
- * IES.json dados extraído em 29/12/2017
+ * CURSOS.json dados extraído em 03/01/2017
+ * IES.json dados extraído em 03/01/2017
  * Foi usado threads, mutex e semáforos para acelerar o processo e garantir integridade dos dados
- * Devido ao tempo elevado de execução é possível terminar a execução e na próxima ele irá buscar apenas o restante (nescessário ambos os JSON's estarem na pasta)
+ * Devido ao tempo elevado de execução é possível fechar a execução do script, na próxima vez ele irá ler o JSON salvo e buscar apenas o restante (nescessário ambos os JSON's estarem na pasta)
  * Recomendado uma boa internet
  * Alguns cursos não têm unidades cadastradas nas IES, esses cursos são salvos em um arquivo separado (cursos_sem_unidades.txt), caso queira trata-los manualmente
 
